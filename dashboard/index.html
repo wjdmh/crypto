@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronos Micro-Scalper</title>
+    <!-- Modern Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #09090b;
+            /* Zinc 950 */
+            --panel-bg: #18181b;
+            /* Zinc 900 */
+            --border-color: #27272a;
+            /* Zinc 800 */
+            --text-main: #fafafa;
+            --text-muted: #a1a1aa;
+            /* Zinc 400 */
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- Header --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .title span {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 1rem;
+        }
+
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.offline {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .status-badge::before {
+            content: '';
+            display: block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        .status-badge:not(.offline)::before {
+            animation: pulse 2s infinite;
+        }
+
+        /* --- Grid Layout --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+            flex-grow: 1;
+            min-height: 0;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            overflow-y: auto;
+        }
+
+        /* Scrollbar styles */
+        .panel-content::-webkit-scrollbar,
+        .log-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .panel-content::-webkit-scrollbar-track,
+        .log-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .panel-content::-webkit-scrollbar-thumb,
+        .log-container::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 4px;
+        }
+
+        .section-header {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* --- Overview Stats --- */
+        .balance-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: var(--bg-color);
+            padding: 1.25rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .balance-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .balance-amount {
+            font-size: 1.75rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .balance-amount.primary {
+            color: var(--text-main);
+        }
+
+        .balance-amount.secondary {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* --- Cards --- */
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .card-item {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            transition: border-color 0.2s;
+        }
+
+        .card-item:hover {
+            border-color: #3f3f46;
+        }
+
+        .card-item.holding {
+            border-left: 2px solid var(--accent);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .card-qty {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            background: var(--panel-bg);
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            letter-spacing: 0.02em;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 8px;
+            font-size: 0.85rem;
+        }
+
+        .stat-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .stat-val {
+            font-weight: 500;
+        }
+
+        .card-footer {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-footer i {
+            display: inline-block;
+            font-style: normal;
+        }
+
+        .empty-state {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 2rem 0;
+            background: var(--bg-color);
+            border: 1px dashed var(--border-color);
+            border-radius: var(--radius-md);
+        }
+
+        /* --- Log Terminal --- */
+        .log-panel {
+            background: #000000;
+        }
+
+        .log-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--panel-bg);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-container {
+            flex-grow: 1;
+            padding: 1.5rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            overflow-y: auto;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .log-entry {
+            word-break: break-all;
+            padding: 2px 0;
+            display: flex;
+            gap: 12px;
+        }
+
+        .log-time {
+            color: #52525b;
+            /* Zinc 600 */
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .log-msg {
+            flex-grow: 1;
+        }
+
+        .log-info {
+            color: #d4d4d8;
+        }
+
+        .log-warning {
+            color: var(--warning);
+        }
+
+        .log-error {
+            color: var(--danger);
+        }
+
+        .log-highlight {
+            color: #60a5fa;
+        }
+
+        .log-success {
+            color: var(--success);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .color-success {
+            color: var(--success);
+        }
+
+        .color-danger {
+            color: var(--danger);
+        }
+
+        .color-neutral {
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="title">
+            Chronos <span>Micro-Scalper</span>
+        </div>
+        <div id="connection-status" class="status-badge offline">
+            연결 끊김
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Left Panel: Status & Positions -->
+        <div class="panel">
+            <div class="panel-content">
+
+                <div>
+                    <div class="section-header">계좌 현황</div>
+                    <div class="balance-group">
+                        <div class="balance-item">
+                            <span class="stat-label">총 평가 자산</span>
+                            <span class="balance-amount primary" id="total-asset-display">-</span>
+                            <div id="asset-metrics"
+                                style="display: none; gap: 12px; font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">
+                                <span>전일 대비: <strong id="prev-daily-pct">-</strong></span>
+                                <span>초기 자본 대비: <strong id="initial-pct">-</strong></span>
+                            </div>
+                        </div>
+                        <div class="balance-item">
+                            <span class="stat-label">주문 가능 현금</span>
+                            <span class="balance-amount secondary" id="balance-display">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="section-header">현재 보유 종목</div>
+                    <div class="card-list" id="holdings-container">
+                        <div class="empty-state">보유 종목 없음</div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="section-header">타점 감시 현황</div>
+                    <div class="card-list" id="surveillance-container">
+                        <div class="empty-state">데이터 없음</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Right Panel: Terminal -->
+        <div class="panel log-panel">
+            <div class="log-header">
+                <div class="section-header" style="margin: 0;">터미널 에뮬레이터</div>
+            </div>
+            <div class="log-container" id="log-terminal">
+                <div class="log-entry log-info" style="justify-content: center; margin-top: 2rem;">
+                    <span class="log-msg" style="color: var(--text-muted); text-align: center;">웹소켓 엔진 연결 중...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById('log-terminal');
+        const totalAssetDisplay = document.getElementById('total-asset-display');
+        const balanceDisplay = document.getElementById('balance-display');
+        const holdingsContainer = document.getElementById('holdings-container');
+        const surveillanceContainer = document.getElementById('surveillance-container');
+        const connectionBadge = document.getElementById('connection-status');
+
+        const formatKRW = (num) => new Intl.NumberFormat('ko-KR').format(num) + ' 원';
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                connectionBadge.textContent = '엔진 통신 정상';
+                connectionBadge.className = 'status-badge pulse';
+                appendLog('SYSTEM', '웹소켓 연결이 확립되었습니다. 실시간 로그를 수신합니다.');
+                // Clear loading text
+                if (terminal.children.length === 1 && terminal.textContent.includes('연결 중')) {
+                    terminal.innerHTML = '';
+                }
+                fetchStatus();
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'log') {
+                    // Python log format is typically: 2026-02-27 12:00:00,000 - [INFO] - Message
+                    // We parse it slightly to separate time and message
+                    const match = data.message.match(/(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3})\s-\s\[(.*?)\]\s(.*)/);
+                    if (match) {
+                        const timeStr = match[1].split(' ')[1].split(',')[0]; // Just HH:MM:SS
+                        const levelStr = match[2];
+                        const msgStr = match[3];
+                        appendParsedLog(timeStr, msgStr);
+                    } else {
+                        appendParsedLog('', data.message);
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                connectionBadge.textContent = '통신 단절';
+                connectionBadge.className = 'status-badge offline';
+                appendLog('SYSTEM', '연결이 끊어졌습니다. 3초 후 재접속을 시도합니다...', 'error');
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function appendParsedLog(timeStr, rawMsg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+
+            let msgClass = 'log-info';
+            if (rawMsg.includes('[WARNING]') || rawMsg.includes('🚨')) msgClass = 'log-warning';
+            else if (rawMsg.includes('[ERROR]') || rawMsg.includes('❌') || rawMsg.includes('🩸')) msgClass = 'log-error';
+            else if (rawMsg.includes('✅') || rawMsg.includes('수익')) msgClass = 'log-success';
+            else if (rawMsg.includes('➡️') || rawMsg.includes('V2')) msgClass = 'log-highlight';
+
+            let timeHtml = timeStr ? `<span class="log-time">${timeStr}</span>` : `<span class="log-time">--:--:--</span>`;
+
+            div.innerHTML = `${timeHtml}<span class="log-msg ${msgClass}">${rawMsg}</span>`;
+            terminal.appendChild(div);
+
+            // Auto scroll to bottom
+            if (terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight < 100) {
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+
+            // Keep only latest 150 logs
+            while (terminal.children.length > 150) {
+                terminal.removeChild(terminal.firstChild);
+            }
+
+            // Immediately refresh status if it's a trade log
+            if (rawMsg.includes('매수') || rawMsg.includes('매도') || rawMsg.includes('엑싯') || rawMsg.includes('동기화')) {
+                if (!isFetchingStatus) setTimeout(fetchStatus, 300);
+            }
+        }
+
+        function appendLog(level, message, type = 'info') {
+            const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+            appendParsedLog(now, message);
+        }
+
+        let isFetchingStatus = false;
+        async function fetchStatus() {
+            if (isFetchingStatus) return;
+            isFetchingStatus = true;
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                if (data.total_asset && typeof data.total_asset === 'object') {
+                    // Update Total Asset (계좌 총 자산)
+                    totalAssetDisplay.textContent = formatKRW(data.total_asset.total);
+
+                    const metricsDiv = document.getElementById('asset-metrics');
+                    const dailyPctEl = document.getElementById('prev-daily-pct');
+                    const initialPctEl = document.getElementById('initial-pct');
+
+                    // 전일 대비 수익률 (계좌 단위, 확정손익 포함)
+                    if (data.total_asset.prev_total > 0) {
+                        const dailyPct = ((data.total_asset.total - data.total_asset.prev_total) / data.total_asset.prev_total) * 100;
+                        dailyPctEl.textContent = (dailyPct > 0 ? '+' : '') + dailyPct.toFixed(2) + '%';
+                        dailyPctEl.className = dailyPct > 0 ? 'color-success' : (dailyPct < 0 ? 'color-danger' : 'color-neutral');
+                    } else {
+                        dailyPctEl.textContent = '0.00%';
+                        dailyPctEl.className = 'color-neutral';
+                    }
+
+                    // 초기 자본 대비 수익률 (계좌 단위, 확정손익 포함)
+                    const initialPct = ((data.total_asset.total - data.total_asset.initial_capital) / data.total_asset.initial_capital) * 100;
+                    initialPctEl.textContent = (initialPct > 0 ? '+' : '') + initialPct.toFixed(2) + '%';
+                    initialPctEl.className = initialPct > 0 ? 'color-success' : (initialPct < 0 ? 'color-danger' : 'color-neutral');
+                    metricsDiv.style.display = 'flex';
+
+                    // Update Unrealized PNL (현재 보유종목 평가손익)
+                    let pnlDisplay = document.getElementById('unrealized-pnl-display');
+                    if (!pnlDisplay) {
+                        // Create element if it doesn't exist
+                        const pnlContainer = document.createElement('div');
+                        pnlContainer.className = 'balance-item';
+                        pnlContainer.style.marginTop = '16px';
+                        pnlContainer.innerHTML = `
+                            <span class="stat-label">현재 보유종목 평가손익</span>
+                            <div style="display:flex; align-items:baseline; gap:8px;">
+                                <span class="balance-amount secondary" id="unrealized-pnl-display" style="font-size:1.5rem;">-</span>
+                                <span id="unrealized-pnl-pct" style="font-weight:600; font-size:1.1rem;">-</span>
+                            </div>
+                        `;
+                        // Insert after Total Asset
+                        const balanceGroup = document.querySelector('.balance-group');
+                        balanceGroup.insertBefore(pnlContainer, balanceGroup.children[1]);
+                        pnlDisplay = document.getElementById('unrealized-pnl-display');
+                    }
+
+                    const pctEl = document.getElementById('unrealized-pnl-pct');
+                    const pnl = data.total_asset.unrealized_pnl || 0;
+                    const purchaseAmt = data.total_asset.total_purchase || 0;
+                    const pnlPct = purchaseAmt > 0 ? (pnl / purchaseAmt) * 100 : 0;
+
+                    pnlDisplay.textContent = (pnl > 0 ? '+' : '') + formatKRW(pnl);
+                    pnlDisplay.className = 'balance-amount secondary ' + (pnl > 0 ? 'color-success' : (pnl < 0 ? 'color-danger' : 'color-neutral'));
+
+                    pctEl.textContent = (pnlPct > 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
+                    pctEl.className = pnlPct > 0 ? 'color-success' : (pnlPct < 0 ? 'color-danger' : 'color-neutral');
+
+                } else {
+                    totalAssetDisplay.textContent = data.total_asset ? formatKRW(data.total_asset) : '-';
+                }
+
+                balanceDisplay.textContent = data.balance ? formatKRW(data.balance) : '-';
+
+                // Holdings
+                holdingsContainer.innerHTML = '';
+                if (!data.holdings || data.holdings.length === 0) {
+                    holdingsContainer.innerHTML = '<div class="empty-state">포지션 없음 (진입 대기)</div>';
+                } else {
+                    data.holdings.forEach(h => {
+                        const item = document.createElement('div');
+                        item.className = 'card-item holding';
+
+                        const profitPct = ((h.current_price - h.buy_price) / h.buy_price) * 100;
+                        const profitClass = profitPct > 0 ? 'color-success' : (profitPct < 0 ? 'color-danger' : 'color-neutral');
+                        const profitSign = profitPct > 0 ? '+' : '';
+
+                        item.innerHTML = `
+                            <div class="card-header">
+                                <span class="card-title">${h.name}</span>
+                                <span class="card-qty">${h.qty}주</span>
+                            </div>
+                            <div class="card-grid">
+                                <div class="stat-group">
+                                    <span class="stat-label">진입 단가</span>
+                                    <span class="stat-val">${formatKRW(h.buy_price)}</span>
+                                </div>
+                                <div class="stat-group">
+                                    <span class="stat-label">현재가</span>
+                                    <span class="stat-val class="${profitClass}">${formatKRW(h.current_price)}</span>
+                                </div>
+                                <div class="stat-group">
+                                    <span class="stat-label">수익률</span>
+                                    <span class="stat-val ${profitClass}">${profitSign}${profitPct.toFixed(2)}%</span>
+                                </div>
+                                <div class="stat-group">
+                                    <span class="stat-label">고점 방어선</span>
+                                    <span class="stat-val">${formatKRW(h.high_watermark)}</span>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <i>🤖</i> <span>${h.status_msg}</span>
+                            </div>
+                        `;
+                        holdingsContainer.appendChild(item);
+                    });
+                }
+
+                // Surveillance
+                surveillanceContainer.innerHTML = '';
+                if (!data.surveillance || data.surveillance.length === 0) {
+                    surveillanceContainer.innerHTML = '<div class="empty-state">감시 대상 없음</div>';
+                } else {
+                    data.surveillance.forEach(s => {
+                        const item = document.createElement('div');
+                        item.className = 'card-item';
+
+                        let obiStr = (s.latest_obi * 100).toFixed(1) + '%';
+                        let obiClass = s.latest_obi > 0.8 ? 'color-success' : (s.latest_obi < 0.2 ? 'color-danger' : 'color-neutral');
+
+                        item.innerHTML = `
+                            <div class="card-header">
+                                <span class="card-title">${s.name} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${s.symbol})</span></span>
+                            </div>
+                            <div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+                                <div class="stat-group">
+                                    <span class="stat-label">현재가</span>
+                                    <span class="stat-val">${formatKRW(s.current_price)}</span>
+                                </div>
+                                <div class="stat-group">
+                                    <span class="stat-label">매수 강도 (OBI)</span>
+                                    <span class="stat-val ${obiClass}">${obiStr}</span>
+                                </div>
+                            </div>
+                            <div class="card-footer" style="margin-top: 8px; padding-top: 8px;">
+                                <i>👀</i> <span>${s.status_msg}</span>
+                            </div>
+                        `;
+                        surveillanceContainer.appendChild(item);
+                    });
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch status", error);
+            } finally {
+                setTimeout(() => { isFetchingStatus = false; }, 1000);
+            }
+        }
+
+        connectWebSocket();
+        setInterval(fetchStatus, 4000);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,183 @@
+{
+    "name": "Chronos V2 - Crypto AI Sentinel",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours"
+                        }
+                    ]
+                }
+            },
+            "id": "eec9fa62-a548-4e89-9b93-b6dff5a1a1f0",
+            "name": "Schedule (1 Hour)",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.1,
+            "position": [
+                200,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://cryptopanic.com/api/v1/posts/?auth_token=YOUR_API_KEY&filter=important",
+                "options": {}
+            },
+            "id": "4b68e7b1-4f1c-4da6-b9a3-d0232df6cc34",
+            "name": "Fetch Crypto News",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                420,
+                300
+            ],
+            "notesInFlow": true,
+            "notes": "Replace YOUR_API_KEY with a free CryptoPanic API Key or use another RSS node"
+        },
+        {
+            "parameters": {
+                "model": "gemini-1.5-flash",
+                "options": {}
+            },
+            "id": "bc1a3b53-48b4-4e78-8317-0fcdf8fa5bb0",
+            "name": "Gemini AI Evaluation",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.4,
+            "position": [
+                640,
+                300
+            ],
+            "notesInFlow": true,
+            "notes": "Connect your Gemini API Credentials here"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "8c352528-6617-48f0-bda3-02ae552199b4",
+                            "name": "prompt",
+                            "value": "You are an expert quantitative crypto trader AI. Here is the latest global crypto news: {{$json.data}}. Evaluate the sentiment and recommend ONE specific coin to focus on right now. Return a JSON strictly in this format: {\"symbol\": \"BTC\", \"sentiment_score\": 0.85, \"reason\": \"A short 1 sentence reason\"}. Allowed symbols: BTC, ETH, XRP, SOL, DOGE. 'sentiment_score' must be between -1.0 to 1.0. If the market is bad, make the score negative and recommend holding BTC.",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "51f2af8e-3ea6-4ed0-bbac-b6c8ba0af467",
+            "name": "AI Prompt Setup",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                540,
+                140
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://host.docker.internal:8000/webhook/n8n",
+                "sendBody": true,
+                "contentType": "raw",
+                "rawContentType": "application/json",
+                "body": "={{ $json.text }}\n",
+                "options": {}
+            },
+            "id": "a1f94c1f-4ee1-450f-ad3d-655f4bc59ac3",
+            "name": "Webhook to Python Engine",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                860,
+                300
+            ],
+            "notesInFlow": true,
+            "notes": "Sends the AI JSON to FastAPI. Make sure the secret_token matches!"
+        },
+        {
+            "parameters": {
+                "keepOnlySet": true,
+                "values": {
+                    "string": [
+                        {
+                            "name": "text",
+                            "value": "={{ $json.text.replace('```json', '').replace('```', '') }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "3beaa70a-fc8a-4c28-9f15-7dffe216ae76",
+            "name": "Clean JSON Output",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                740,
+                460
+            ]
+        }
+    ],
+    "connections": {
+        "Schedule (1 Hour)": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Crypto News",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Crypto News": {
+            "main": [
+                [
+                    {
+                        "node": "Gemini AI Evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Prompt Setup": {
+            "main": [
+                [
+                    {
+                        "node": "Gemini AI Evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Gemini AI Evaluation": {
+            "main": [
+                [
+                    {
+                        "node": "Clean JSON Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Clean JSON Output": {
+            "main": [
+                [
+                    {
+                        "node": "Webhook to Python Engine",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "f0ad08eb-0e06-40e9-b2b9-2ce138a087a3"
+}

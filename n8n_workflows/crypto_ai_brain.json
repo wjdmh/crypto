@@ -1,0 +1,178 @@
+{
+    "name": "Chronos - Crypto AI Brain",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "1",
+            "name": "When clicking \"Execute Workflow\"",
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "*/5 * * * *"
+                        }
+                    ]
+                }
+            },
+            "id": "2",
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.1,
+            "position": [
+                250,
+                460
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://cryptopanic.com/api/v1/posts/?auth_token=YOUR_CRYPTOPANIC_API_KEY",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Accept",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "3",
+            "name": "Fetch Crypto News API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                460,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gemini-2.5-pro",
+                "options": {}
+            },
+            "id": "4",
+            "name": "Google Gemini Model",
+            "type": "@n8n/n8n-nodes-langchain.lmGoogleGemini",
+            "typeVersion": 1,
+            "position": [
+                680,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{ $json.results.map(item => item.title).join('\\n') }}",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "message": "You are a quantitative cryptocurrency analyst. Read the following recent headlines from CryptoPanic.\nAssign a semantic sentiment score for the overall crypto market right now.\nThe score MUST be exactly ONE number between -1.0 (Bearish/Crash Warning) and 1.0 (Bullish/Pumping).\nDo NOT output anything other than the number."
+                        }
+                    ]
+                }
+            },
+            "id": "5",
+            "name": "Basic LLM Chain",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 2,
+            "position": [
+                660,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://localhost:8001/webhook/sentiment",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "score",
+                            "value": "={{ $json.text }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "6",
+            "name": "Send Signal to Engine (Webhook)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                880,
+                380
+            ]
+        }
+    ],
+    "connections": {
+        "When clicking \"Execute Workflow\"": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Crypto News API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Crypto News API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Crypto News API": {
+            "main": [
+                [
+                    {
+                        "node": "Basic LLM Chain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Gemini Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Basic LLM Chain",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Basic LLM Chain": {
+            "main": [
+                [
+                    {
+                        "node": "Send Signal to Engine (Webhook)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

@@ -1,0 +1,221 @@
+{
+  "name": "Chronos: Agentic Narrative",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "40 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Cron (08:40 AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "평일 아침 8시 40분 실행"
+    },
+    {
+      "parameters": {
+        "url": "=https://openapi.naver.com/v1/search/news.json?query={{encodeURI('주식 강력 매수 OR 호재 OR 단독')}}&display=20&sort=date",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "name": "Fetch Market News (Naver)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "네이버 뉴스 API에서 장전 강력한 호재 뉴스 수집"
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all()[0].json.items || [];\nlet textBlock = \"[오늘 아침 8시 40분 시장 주요 뉴스]\\n\";\n\nitems.forEach(item => {\n  textBlock += `- 제목: ${item.title.replace(/<[^>]*>?/gm, '')}\\n  내용: ${item.description.replace(/<[^>]*>?/gm, '')}\\n`;\n});\n\nreturn [{ json: { newsText: textBlock } }];"
+      },
+      "name": "Format News Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.newsText }}",
+        "messages": {
+          "messageValues": [
+            {
+              "content": "너는 대한민국 최고의 단타 프랍 트레이더야. 입력된 아침 8시 40분 뉴스 데이터를 읽고, 오늘 시초가에 수급이 폭발적으로 몰려서 단기 급등(상한가 혹은 +10% 이상)을 만들어낼 **압도적인 호재(Narrative)가 있는 종목 딱 1~2개**만 추출해.\\n\\n[조건]\\n1. 단순한 실적 발표나 뻔한 뉴스는 무시할 것.\\n2. '정부 정책 수혜', '단독 수주', '바이오 임상 성공', 'M&A' 등 파급력이 큰 키워드에 가중치를 둘 것.\\n3. 만약 오늘 당장 급등할 만한 확실한 종목이 안 보이면 무조건 '종목 없음'이라고 답변할 것. 억지로 뽑지 마.\\n\\n[출력 포맷 (JSON 형식으로만 대답할 것)]\\n{\\n  \"targets\": [\\n    {\\n      \"종목명\": \"삼성전자\",\\n      \"이유 요약\": \"단독 호재 기사 발생\",\\n      \"강도\": \"상\"\\n    }\\n  ],\\n  \"hasTarget\": true\\n}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "name": "LLM: Narrative Evaluator",
+      "type": "@n8n/n8n-nodes-langchain.advancedGoogleGeminiChatModel",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "뉴스 기반 강력 테마주 필터링 (Gemini 모델)"
+    },
+    {
+      "parameters": {
+        "functionCode": "let rawContent = $input.all()[0].json.output || $input.all()[0].json.text || \"\";\n// 혹시 마크다운 블록이 섞여있으면 제거\nrawContent = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();\ntry {\n  const parsed = JSON.parse(rawContent);\n  return [{ json: parsed }];\n} catch (e) {\n  return [{ json: { hasTarget: false, error: e.message, raw: rawContent } }];\n}"
+      },
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "LLM 결과 JSON 파싱"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasTarget }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check Valid Targets",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $json.targets || [];\nlet msg = `🚨 [Chronos: Agentic Narrative 타겟 포착] 🚨\\n\\n오늘 시초가 수급 폭발 예상 종목입니다.\\n`\n\ndata.forEach(t => {\n  msg += `\\n▪️ 종목명: ${t.종목명}\\n💬 내러티브: ${t['이유 요약']}\\n🔥 강도: ${t.강도}\\n`;\n});\n\nmsg += `\\n⚠️ [매매 지침 (자금 50만원)]\\n1. 9시 정각 개장 후 추격 매수 금지\\n2. 9시 5분까지의 VWAP(거래량 가중 평균가) 지지 여부 확인 후 진입\\n3. 손절가: 진입가 대비 -2% (혹은 이전 5분봉의 저가 이탈 시)\\n4. 익절가: 진입가 대비 +3% ~ +5% 이상 자율 대응`;\n\nreturn [{ json: { telegramMsg: msg } }];"
+      },
+      "name": "Format Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7839028905",
+        "text": "={{ $json.telegramMsg }}",
+        "additionalFields": {}
+      },
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        1650,
+        150
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron (08:40 AM)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Market News (Naver)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Market News (Naver)": {
+      "main": [
+        [
+          {
+            "node": "Format News Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format News Data": {
+      "main": [
+        [
+          {
+            "node": "LLM: Narrative Evaluator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM: Narrative Evaluator": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Check Valid Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Valid Targets": {
+      "main": [
+        [
+          {
+            "node": "Format Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

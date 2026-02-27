@@ -1,0 +1,278 @@
+{
+  "name": "Chronos: Multi-Agent V3.0 (Sector & Chart)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "telegram-trigger-node",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -680,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://openapi.naver.com/v1/search/news.json?query={{encodeURI('경제 OR 금융 OR 기업')}}&display=50&sort=date",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Naver-Client-Id",
+              "value": "UuP49CVuHH5YeAvxpIxr"
+            },
+            {
+              "name": "X-Naver-Client-Secret",
+              "value": "n5Tdm7NBEN"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Agent 1: Sector News Crawler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -480,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  item.json.newsText = JSON.stringify([{\"title\": \"테스트 기사\", \"description\": \"수동 실행 테스트입니다.\"}]);\n  item.json.chatId = \"INPUT_YOUR_TELEGRAM_CHAT_ID_HERE\";\n}\nreturn $input.all();"
+      },
+      "name": "Format Data for LLM 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -280,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.newsText }}\n\n너는 대한민국 최고의 '탑다운(Top-Down) 주도 섹터 분석가'야. 입력된 경제/증시 뉴스 데이터를 바탕으로, **어떤 폭락장이 와도 가장 강하게 돈이 몰리고 있는(상승하는) 테마나 섹터 1~2개**와 해당 섹터의 대표 종목명을 정확히 추출해.\n\n[조건]\n1. 단순 개별 호재(단발성 뉴스)가 아니라, 돈이 순환하며 꾸준히 수급이 몰리는 '섹터(예: 전력설비, AI, 화장품 등)'를 찾아야 해.\n2. 추출된 섹터 이름과 그 섹터를 대표하는 가장 강한 대장주 종목명(예: 삼성전자, 알테오젠 등)을 JSON 형태로 출력할 것.\n\n[출력 포맷 (반드시 JSON)]\n{\n  \"sectors\": [\n    {\n      \"섹터명\": \"AI 전력 인프라\",\n      \"분석\": \"엔비디아 발 훈풍과 함께 지속적인 수급 쏠림 확인\",\n      \"관심종목\": [\"HD현대일렉트릭\", \"LS ELECTRIC\"]\n    }\n  ],\n  \"hasTarget\": true\n}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        500
+      ],
+      "name": "Agent 1: Sector Analyst",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "0c6bMVkyh8P9CsQE",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://m.stock.naver.com/api/json/sise/siseListJson.nhn?menu=high_up&sosok=1",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            }
+          ]
+        }
+      },
+      "name": "Market Context (KOSDAQ Top Gainers)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        120,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const agent1Response = $('Agent 1: Sector Analyst').first().json.text || $('Agent 1: Sector Analyst').first().json.content || \"{}\";\nconst marketContext = $input.first().json;\n\nreturn [{\n  json: {\n    agent1_json: agent1Response,\n    market_data: JSON.stringify(marketContext).substring(0, 3000)\n  }\n}];"
+      },
+      "name": "Merge Agent 1 & Market Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.agent1_json }}\\n\\n위의 섹터와 종목을 바탕으로 차트 관점의 기술적 분석을 수행해주세요."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        500
+      ],
+      "name": "Agent 2: Technical Strategist",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "0c6bMVkyh8P9CsQE",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nlet responseText = \"분석 전문을 생성할 수 없습니다.\";\n\ntry {\n  responseText = $input.first().json.content.parts[0].text;\n} catch (error) {\n  if ($input.first().json.text) {\n     responseText = $input.first().json.text;\n  }\n}\n\nreturn [{ json: { telegramMsg: responseText.trim() } }];\n"
+      },
+      "name": "Extract Briefing String",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
+        "text": "={{ $json.telegramMsg }}"
+      },
+      "name": "Send Multi-Agent Briefing to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        1020,
+        500
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "J5MTZl17Pv1MKj5u",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Agent 1: Sector News Crawler": {
+      "main": [
+        [
+          {
+            "node": "Format Data for LLM 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data for LLM 1": {
+      "main": [
+        [
+          {
+            "node": "Agent 1: Sector Analyst",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 1: Sector Analyst": {
+      "main": [
+        [
+          {
+            "node": "Market Context (KOSDAQ Top Gainers)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Market Context (KOSDAQ Top Gainers)": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent 1 & Market Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Agent 1 & Market Data": {
+      "main": [
+        [
+          {
+            "node": "Agent 2: Technical Strategist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2: Technical Strategist": {
+      "main": [
+        [
+          {
+            "node": "Extract Briefing String",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Briefing String": {
+      "main": [
+        [
+          {
+            "node": "Send Multi-Agent Briefing to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Agent 1: Sector News Crawler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f7ab0a72-f1d3-49d6-8b7a-8fcd5ffda54c"
+}
