@@ -59,7 +59,7 @@
                         {
                             "id": "8c352528-6617-48f0-bda3-02ae552199b4",
                             "name": "prompt",
-                            "value": "You are an expert quantitative crypto trader AI. Here is the latest global crypto news: {{$json.data}}. Evaluate the sentiment and recommend ONE specific coin to focus on right now. Return a JSON strictly in this format: {\"symbol\": \"BTC\", \"sentiment_score\": 0.85, \"reason\": \"A short 1 sentence reason\"}. Allowed symbols: BTC, ETH, XRP, SOL, DOGE. 'sentiment_score' must be between -1.0 to 1.0. If the market is bad, make the score negative and recommend holding BTC.",
+                            "value": "You are an expert quantitative crypto trader AI. Here is the latest global crypto news: {{$json.data}}. Evaluate the overall sentiment and recommend ONE specific coin to focus on right now. You MUST return ONLY a single raw JSON object (no markdown, no code blocks, no extra text) strictly in this exact format: {\"symbol\": \"BTC\", \"sentiment_score\": 0.85, \"reason\": \"A short 1 sentence reason\", \"secret_token\": \"n8n_chronos_secret_2026\"}. Allowed symbols: BTC, ETH, XRP, SOL, DOGE. sentiment_score must be a number between -1.0 and 1.0. If the market is bad, make the score negative and recommend BTC. The secret_token field must always be exactly \"n8n_chronos_secret_2026\". Output ONLY the JSON object, nothing else.",
                             "type": "string"
                         }
                     ]
@@ -78,11 +78,11 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "http://host.docker.internal:8000/webhook/n8n",
+                "url": "https://crypto-production-3d81.up.railway.app/webhook/n8n",
                 "sendBody": true,
                 "contentType": "raw",
                 "rawContentType": "application/json",
-                "body": "={{ $json.text }}\n",
+                "body": "={{ $json.text.trim() }}",
                 "options": {}
             },
             "id": "a1f94c1f-4ee1-450f-ad3d-655f4bc59ac3",
