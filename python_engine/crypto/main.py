@@ -2,6 +2,7 @@ import asyncio
 import logging
 import signal
 import sys
+import os
 import uvicorn
 from contextlib import asynccontextmanager
 
@@ -17,9 +18,11 @@ engine_instance = None
 
 async def start_fastapi():
     """FastAPI 웹훅 서버를 비동기로 실행"""
-    config = uvicorn.Config(app=webhook_app, host="0.0.0.0", port=8000, log_level="warning")
+    # Railway 환경변수(PORT) 대응
+    port = int(os.environ.get("PORT", "8000"))
+    config = uvicorn.Config(app=webhook_app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(config)
-    log.info("Starting Webhook API Server on http://0.0.0.0:8000 ...")
+    log.info(f"Starting Webhook API Server on http://0.0.0.0:{port} ...")
     await server.serve()
 
 async def start_trading_engine():
